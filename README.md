@@ -1,34 +1,44 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Overview
 
-## Getting Started
+This repository serves as a small demonstrative space to address a specific issue related to Next.js 13 and Jest testing, previously raised on both [Stackoverflow](https://stackoverflow.com/questions/74891205/next-13-jest-test-fails-using-next-headers) and [Github Issues](https://github.com/vercel/next.js/discussions/44270)
 
-First, run the development server:
+## Issue Description
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+While executing `yarn test`, if any component imports anything from the server-components, Jest tests fail. I.e. the issue
+in `Simple.tsx` occurs because of an error relating to the next/headers import as illustrated below:
+
+```
+  x NEXT_RSC_ERR_CLIENT_IMPORT: next/headers
+       ,-[1:1]
+     1 | import { cookies } from 'next/headers';
+       : ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     2 |
+     3 | function Simple() {
+     4 |   console.log({ cookies });
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Current Solution
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+I have observed that the issue stems from the `next/jest` setup, where `SWC` is used as the transform. To mitigate this issue, the following changes are made:
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+Added new `jest.config.js` file with the following configuration:
 
-## Learn More
+```javascript
+module.exports = {
+	setupFilesAfterEnv: ["./jest/setup.js"],
+	testEnvironment: "jest-environment-jsdom",
+	transform: {
+		"^.+\\.(js|jsx|ts|tsx)$": ["babel-jest", { presets: ["next/babel"] }],
+	},
+};
+```
 
-To learn more about Next.js, take a look at the following resources:
+The purpose of this new configuration file is to replace SWC with Babel for transforming JS, JSX, TS, and TSX files.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Added `server-only.js` file to mock directory to simulate the server components. This mock prevents the error from being thrown.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+```javascript
+module.exports = {};
+```
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+With these changes in place, Jest tests involving components that import anything from the server-components should now pass without any issues.
